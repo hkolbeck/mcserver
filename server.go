@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	STOPTIMEOUT = 10e9
+	STOPTIMEOUT = 10 //Time in seconds to wait for server to die cleanly.
 	IN          = 0
 	OUT         = 1
 	ERR         = 2
@@ -52,10 +52,6 @@ func NewServer(command string, args []string, dir string, infoLog, errLog *log.L
 	errChan := make(chan string, 1024)
 	signals := []chan bool{make(chan bool, 1), make(chan bool, 1), make(chan bool, 1)}
 
-	for _, c := range signals {
-		c <- false
-	}
-
 	server := &Server{
 		In:     inChan,
 		Out:    outChan,
@@ -74,9 +70,9 @@ func NewServer(command string, args []string, dir string, infoLog, errLog *log.L
 		running: false,
 	}
 
-	go server.writeIn(inChan, signals[0])
-	go server.readOut(outChan, signals[1])
-	go server.readErr(errChan, signals[2])
+	go server.writeIn(inChan, signals[IN])
+	go server.read(&server.serverOut, outChan, signals[OUT])
+	go server.read(&server.serverErr, errChan, signals[ERR])
 
 	return server, nil
 }
@@ -157,11 +153,12 @@ func (self *Server) Stop(delay time.Duration, msg string) (err error) {
 	select {
 	case <-itsDeadJim:
 		return
-	case <-(time.After(STOPTIMEOUT)):
+	case <-time.After(STOPTIMEOUT * time.Second):
 		if err = self.cmd.Process.Kill(); err != nil {
 			return err
 		}
-		err = self.cmd.Wait()
+		//Process has been killed, if wait doesn't return immediately something is broken.
+		err = self.cmd.Wait() 
 	}
 
 	return err
@@ -183,8 +180,10 @@ func (self *Server) GetPID() (int, error) {
 	return self.cmd.Process.Pid, nil
 }
 
-func (self *Server) readErr(errChan chan string, signal chan bool) {
+func (self *Server) read(stream **bufio.Reader, writeChan chan string, signal chan bool) {
 	var l []byte
+
+	<-signal //Wait for the start signal
 
 	for self.alive {
 		select {
@@ -194,43 +193,22 @@ func (self *Server) readErr(errChan chan string, signal chan bool) {
 			}
 
 		default:
-			line, prefix, err := self.serverErr.ReadLine()
+			line, prefix, err := stream.ReadLine()
 			if err == nil {
 				for prefix && err == nil {
-					l, prefix, err = self.serverErr.ReadLine()
+					l, prefix, err = stream.ReadLine()
 					line = append(line, l...)
 				}
-				errChan <- string(line)
+				writeChan <- string(line)
 			}
 		}
 	}
-}
-
-func (self *Server) readOut(outChan chan string, signal chan bool) {
-	var l []byte
-
-	for self.alive {
-		select {
-		case run := <-signal:
-			for !run {
-				run = <-signal
-			}
-
-		default:
-			line, prefix, err := self.serverOut.ReadLine()
-			if err == nil {
-				for prefix && err == nil {
-					l, prefix, err = self.serverOut.ReadLine()
-					line = append(line, l...)
-				}
-				outChan <- string(line)
-			}
-		}
-	}
-
 }
 
 func (self *Server) writeIn(in <-chan string, signal chan bool) {
+	
+	<-signal //Wait for the start signal
+
 	for self.alive {
 		select {
 		case cmd := <-self.privIn:

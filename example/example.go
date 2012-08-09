@@ -32,6 +32,12 @@ func main() {
 	go writeOut(server.Out)
 	go writeErr(server.Err)
 
+	err = server.Start()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	fmt.Println("Main Sleeping")
 
 	select {}
