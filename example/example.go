@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"flag"
 	mc "github.com/ckolbeck/mcserver"
 	"log"
 	"os"
@@ -10,18 +11,23 @@ import (
 
 var logInfo, logErr *log.Logger
 
-const (
-	MCServerBinary = "/path/to/minecraft_server.jar"
-	MCDirectory    = "/path/to/server/configs"
-)
-
 func main() {
+	var serverJar = flag.String("jar", "", "the /path/to/minecraft_server.jar (required)")
+	var serverDir = flag.String("dir", ".", "the /path/to/minecraft/configs")
+	flag.Parse()
+
+	if *serverJar == "" {
+		fmt.Fprintln(os.Stderr, "You must specify the location of the minecraft jar with --jar.")
+		os.Exit(1)
+	}
+
+
 	logInfo = log.New(os.Stdout, "[I] ", log.LstdFlags|log.Lshortfile)
 	logErr = log.New(os.Stderr, "[E] ", log.LstdFlags|log.Lshortfile)
 
 	server, err := mc.NewServer("java",
-		[]string{"-Xms1024M", "-Xmx1024M", "-jar", MCServerBinary, "nogui"},
-		MCDirectory, logInfo, logErr)
+		[]string{"-Xms1024M", "-Xmx1024M", "-jar", *serverJar, "nogui"},
+		*serverDir, logInfo, logErr)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
