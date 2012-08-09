@@ -1,7 +1,7 @@
 package main
 
 import (
-	mc "cbeck/mcserver"
+	mc "github.com/ckolbeck/mcserver"
 	"bufio"
 	"fmt"
 	"log"
@@ -10,14 +10,19 @@ import (
 
 var logInfo, logErr *log.Logger
 
+const (
+	MCServerBinary = "/path/to/minecraft_server.jar"
+	MCDirectory = "/path/to/server/configs"
+)
+
 func main() {
 	logInfo = log.New(os.Stdout, "[I] ", log.LstdFlags | log.Lshortfile)
 	logErr = log.New(os.Stderr, "[E] ", log.LstdFlags | log.Lshortfile)
 
 
 	server, err := mc.NewServer("java", 
-		[]string{"-Xms1024M", "-Xmx1024M", "-jar", "/home/cbeck/mc/minecraft_server.jar", "nogui"},
-		"/home/cbeck/mc/", logInfo, logErr)
+		[]string{"-Xms1024M", "-Xmx1024M", "-jar", MCServerBinary, "nogui"},
+		MCDirectory, logInfo, logErr)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
