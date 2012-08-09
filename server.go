@@ -8,46 +8,45 @@ package mcserver
 
 import (
 	"bufio"
-	"exec"
+	"errors"
 	"io"
 	"log"
-	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
 
 const (
 	STOPTIMEOUT = 10e9
-	IN = 0
-	OUT = 1
-	ERR = 2
+	IN          = 0
+	OUT         = 1
+	ERR         = 2
 )
 
-
 type Server struct {
-	In chan<- string
-	Out <-chan string
-	Err <-chan string
+	In     chan<- string
+	Out    <-chan string
+	Err    <-chan string
 	privIn chan string
 
-	cmd *exec.Cmd
-	serverIn io.Writer
+	cmd       *exec.Cmd
+	serverIn  io.Writer
 	serverOut *bufio.Reader
 	serverErr *bufio.Reader
 
 	serverCommand string
-	serverArgs []string
-	dir string
-	
+	serverArgs    []string
+	dir           string
+
 	infoLog *log.Logger
-	errLog *log.Logger
+	errLog  *log.Logger
 
 	signals []chan bool
-	alive bool
+	alive   bool
 	running bool
 }
 
-func NewServer(command string, args []string, dir string, infoLog, errLog *log.Logger) (*Server, os.Error) {
+func NewServer(command string, args []string, dir string, infoLog, errLog *log.Logger) (*Server, error) {
 	inChan := make(chan string, 1024)
 	outChan := make(chan string, 1024)
 	errChan := make(chan string, 1024)
@@ -58,21 +57,21 @@ func NewServer(command string, args []string, dir string, infoLog, errLog *log.L
 	}
 
 	server := &Server{
-	In: inChan,
-	Out: outChan,
-	Err: errChan,
-	privIn: make(chan string),
+		In:     inChan,
+		Out:    outChan,
+		Err:    errChan,
+		privIn: make(chan string),
 
-	serverCommand: command,
-	serverArgs: args,
-	dir: dir,
+		serverCommand: command,
+		serverArgs:    args,
+		dir:           dir,
 
-	infoLog: infoLog,
-	errLog: errLog,
+		infoLog: infoLog,
+		errLog:  errLog,
 
-	signals: signals,
-	alive: true,
-	running: false,
+		signals: signals,
+		alive:   true,
+		running: false,
 	}
 
 	go server.writeIn(inChan, signals[0])
@@ -86,25 +85,25 @@ func (self *Server) IsRunning() bool {
 	return self.running
 }
 
-func (self *Server) Start() os.Error {
+func (self *Server) Start() error {
 	if self.running {
-		return os.NewError("Server already started.")
+		return errors.New("Server already started.")
 	}
 
-	self.cmd = exec.Command(self.serverCommand, self.serverArgs...) 
+	self.cmd = exec.Command(self.serverCommand, self.serverArgs...)
 	self.cmd.Dir = self.dir
 
-	in, e := self.cmd.StdinPipe() 
+	in, e := self.cmd.StdinPipe()
 	if e != nil {
 		return e
 	}
 
-	out, e := self.cmd.StdoutPipe() 
+	out, e := self.cmd.StdoutPipe()
 	if e != nil {
 		return e
 	}
 
-	err, e := self.cmd.StderrPipe() 
+	err, e := self.cmd.StderrPipe()
 	if e != nil {
 		return e
 	}
@@ -114,7 +113,7 @@ func (self *Server) Start() os.Error {
 	}
 
 	self.infoLog.Printf("Server forked, pid %d\n", self.cmd.Process.Pid)
-	
+
 	self.serverIn = in
 	self.serverOut = bufio.NewReader(out)
 	self.serverErr = bufio.NewReader(err)
@@ -129,9 +128,9 @@ func (self *Server) Start() os.Error {
 	return nil
 }
 
-func (self *Server) Stop(delay int64, msg string) (err os.Error) {
+func (self *Server) Stop(delay int64, msg string) (err error) {
 	if !self.running {
-		return os.NewError("Server not running.")
+		return errors.New("Server not running.")
 	}
 	self.running = false
 
@@ -147,7 +146,7 @@ func (self *Server) Stop(delay int64, msg string) (err os.Error) {
 	self.signals[ERR] <- false
 	self.privIn <- "stop\n"
 	self.signals[IN] <- false
-	
+
 	itsDeadJim := make(chan bool)
 
 	go func() {
@@ -168,7 +167,7 @@ func (self *Server) Stop(delay int64, msg string) (err os.Error) {
 	return err
 }
 
-func (self *Server) Destroy() os.Error {
+func (self *Server) Destroy() error {
 	err := self.Stop(0, "Server going down NOW")
 	self.alive = false
 	close(self.In)
@@ -178,14 +177,13 @@ func (self *Server) Destroy() os.Error {
 	return err
 }
 
-func (self *Server) GetPID() (int, os.Error) {
+func (self *Server) GetPID() (int, error) {
 	if !self.running {
-		return -1, os.NewError("Server not running.")
-	}	
+		return -1, errors.New("Server not running.")
+	}
 
 	return self.cmd.Process.Pid, nil
 }
-
 
 func (self *Server) readErr(errChan chan string, signal chan bool) {
 	var l []byte
@@ -237,7 +235,7 @@ func (self *Server) readOut(outChan chan string, signal chan bool) {
 func (self *Server) writeIn(in <-chan string, signal chan bool) {
 	for self.alive {
 		select {
-		case cmd := <-self.privIn: 
+		case cmd := <-self.privIn:
 			self.serverIn.Write([]byte(cmd))
 			if !strings.HasSuffix(cmd, "\n") {
 				self.serverIn.Write([]byte{'\n'})

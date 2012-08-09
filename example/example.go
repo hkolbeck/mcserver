@@ -1,9 +1,9 @@
 package main
 
 import (
-	mc "github.com/ckolbeck/mcserver"
 	"bufio"
 	"fmt"
+	mc "github.com/ckolbeck/mcserver"
 	"log"
 	"os"
 )
@@ -12,15 +12,14 @@ var logInfo, logErr *log.Logger
 
 const (
 	MCServerBinary = "/path/to/minecraft_server.jar"
-	MCDirectory = "/path/to/server/configs"
+	MCDirectory    = "/path/to/server/configs"
 )
 
 func main() {
-	logInfo = log.New(os.Stdout, "[I] ", log.LstdFlags | log.Lshortfile)
-	logErr = log.New(os.Stderr, "[E] ", log.LstdFlags | log.Lshortfile)
+	logInfo = log.New(os.Stdout, "[I] ", log.LstdFlags|log.Lshortfile)
+	logErr = log.New(os.Stderr, "[E] ", log.LstdFlags|log.Lshortfile)
 
-
-	server, err := mc.NewServer("java", 
+	server, err := mc.NewServer("java",
 		[]string{"-Xms1024M", "-Xmx1024M", "-jar", MCServerBinary, "nogui"},
 		MCDirectory, logInfo, logErr)
 
@@ -35,7 +34,7 @@ func main() {
 
 	fmt.Println("Main Sleeping")
 
-	select{}
+	select {}
 }
 
 func readIn(pipe chan<- string, server *mc.Server) {
@@ -48,12 +47,12 @@ func readIn(pipe chan<- string, server *mc.Server) {
 		} else if len(line) < 1 {
 			continue
 		}
-		
+
 		if line[0] == '!' {
 			switch string(line[1:]) {
 			case "start":
 				if err := server.Start(); err != nil {
-					logErr.Println(err)					
+					logErr.Println(err)
 				}
 			case "stop":
 				if err := server.Stop(0, ""); err != nil {
