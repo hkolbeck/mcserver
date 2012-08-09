@@ -128,7 +128,7 @@ func (self *Server) Start() error {
 	return nil
 }
 
-func (self *Server) Stop(delay int64, msg string) (err error) {
+func (self *Server) Stop(delay time.Duration, msg string) (err error) {
 	if !self.running {
 		return errors.New("Server not running.")
 	}
@@ -171,8 +171,6 @@ func (self *Server) Destroy() error {
 	err := self.Stop(0, "Server going down NOW")
 	self.alive = false
 	close(self.In)
-	close(self.Out)
-	close(self.Err)
 
 	return err
 }
